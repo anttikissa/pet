@@ -1,3 +1,4 @@
 when I say 'first'
 and I wait 100 milliseconds
 and I say 'second'
+and I fail because 'sky is blue'

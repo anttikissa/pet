@@ -114,23 +114,44 @@ lines.forEach(function(line, idx) {
 		f: parsed.step.f,
 		args: parsed.args
 	});
-	//parsed.step.f.apply(null, parsed.args);
 });
 
 var stepPromise = Promise.resolve();
 
+function StepError(step, originalError) {
+	this.step = step;
+	this.originalError = originalError;
+}
+
 for (let step of stepsToRun) {
 	stepPromise = stepPromise.then(function() {
-		log(step.location, step.line);
+		log(step.location + '>', step.line);
 		return step.f.apply(null, step.args);
+	}).catch(function(error) {
+		if (!(error instanceof StepError)) {
+			throw new StepError(step, error);
+		} else {
+			throw error;
+		}
 	});
+
+	stepPromise.step = step;
 }
 
 stepPromise.then(function() {
 	log('All tests run successfully!');
 }).catch(function(err) {
-	log('step failed!', err);
-	log('step failed!', err.stack);
+	if (err instanceof StepError) {
+		log('\nStep failed:');
+		log(err.step.location + '> ' + err.step.line);
+		log('Reason:', err.originalError);
+		if (err.originalError.stack) {
+			log(err.originalError.stack);
+		}
+	} else {
+		log('\nSomething went wrong:', err);
+		log(err.stack);
+	}
 });
 
 

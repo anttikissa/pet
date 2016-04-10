@@ -1,5 +1,11 @@
 var step = require('./pet').step;
 
+step('I fail because $reason', function(reason) {
+	//This works, too - if you want a stacktrace
+	//throw new Error(reason);
+	return Promise.reject(reason);
+});
+
 step('I say $text', function(text) {
 	console.log('Say', text);
 });
