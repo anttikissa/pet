@@ -1,3 +1,4 @@
+'use strict';
 var fs = require('fs');
 var log = console.log.bind(console);
 
@@ -98,17 +99,39 @@ var test = fs.readFileSync(filename, 'utf8');
 
 var lines = test.replace(/\n$/, '').split("\n");
 
+var stepsToRun = [];
+
 lines.forEach(function(line, idx) {
 	var lineNumber = idx + 1;
 	var parsed = parse(line, lineNumber);
 	if (!parsed) {
 		return;
 	}
-	log(filename + ':' + lineNumber, line);
 	//log("Line parsed.", parsed.step.f, parsed.args);
-	parsed.step.f.apply(null, parsed.args);
+	stepsToRun.push({
+		location: filename + ':' + lineNumber,
+		line: line,
+		f: parsed.step.f,
+		args: parsed.args
+	});
+	//parsed.step.f.apply(null, parsed.args);
 });
 
+var stepPromise = Promise.resolve();
+
+for (let step of stepsToRun) {
+	stepPromise = stepPromise.then(function() {
+		log(step.location, step.line);
+		return step.f.apply(null, step.args);
+	});
+}
+
+stepPromise.then(function() {
+	log('All tests run successfully!');
+}).catch(function(err) {
+	log('step failed!', err);
+	log('step failed!', err.stack);
+});
 
 
 

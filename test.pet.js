@@ -9,7 +9,6 @@ step('I say $text and I also say $somethingElse', function(text, somethingElse) 
 });
 
 step('I wait $ms milliseconds', function(ms) {
-	// TODO won't work yet!
 	return new Promise(function(resolve) {
 		console.log('wait start');
 		setTimeout(function() {
