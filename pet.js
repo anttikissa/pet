@@ -1,14 +1,38 @@
 'use strict';
+
 var fs = require('fs');
+var util = require('util');
+
 var log = console.log.bind(console);
 
 var steps = [];
 
 function assert(fact) {
 	if (!fact) {
-		throw new Error("assertion failed");
+		throw new Error("Assertion failed");
 	}
 }
+
+// Assert that 'actual' and 'expected' appear equal when stringified.
+// Works well for simple values, but be warned that e.g. { a: 1, b: 1 } is not equal to { b: 1, a: 1 }
+//
+// 'what' is an optional string describing the nature of compared values. Use it to get
+// better error messages:
+//
+//     assert.eq(data.howManyApples, 3, "amount of apples");
+//
+// => "Expected amount of apples to be 3, but it was 0."
+assert.eq = function(actual, expected, what) {
+	if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+		var actualString = util.inspect(actual);
+		var expectedString = util.inspect(expected);
+		if (what) {
+			throw new Error("Expected " + what + " to be " + expectedString + ", but it was " + actualString);
+		} else {
+			throw new Error("Expected value to be " + expectedString + ", but it was " + actualString)
+		}
+	}
+};
 
 // Convert string literals like '"this"' into 'this' (likewise for double quotes),
 // and number literals like "12345" into numbers.
@@ -45,7 +69,7 @@ function findStep(line) {
 //
 // capturing "abc" and "xyz".
 function createRecognizer(what) {
-	var result = what.replace(/(\$(\w|-)+)\b/g, function(match) {
+	var result = what.replace(/(\$(\w|-)+)\b/g, function(/* match */) {
 		//log('match', match);
 		//This monster matches either "string constants" or 'string constants'
 		// (like in JavaScript). It captures the whole thing, quotes included.
@@ -69,7 +93,9 @@ module.exports = {
 		steps.push(newStep);
 
 		//log('step', what);
-	}
+	},
+
+	assert: assert
 };
 
 function isCommentedOut(line) {
@@ -82,12 +108,12 @@ function parse(line, lineNumber) {
 	}
 	var match = line.trim().match(/^(?:given|when|then|and) (.*)$/);
 	if (!match) {
-		throw new Error('error on line ' + lineNumber + ': ' + line);
+		throw new Error('Syntax error on line ' + lineNumber + ': ' + line);
 	}
 	//log('finding step for line', idx + ':', match[1]);
 	var result = findStep(match[1]);
 	if (!result) {
-		throw new Error('no step matches line ' + lineNumber + ': ' + line);
+		throw new Error('No step matches line ' + lineNumber + ': ' + line);
 	}
 	return result;
 }
@@ -123,10 +149,12 @@ function StepError(step, originalError) {
 	this.originalError = originalError;
 }
 
+var context = {};
+
 for (let step of stepsToRun) {
 	stepPromise = stepPromise.then(function() {
 		log(step.location + '>', step.line);
-		return step.f.apply(null, step.args);
+		return step.f.apply(context, step.args);
 	}).catch(function(error) {
 		if (!(error instanceof StepError)) {
 			throw new StepError(step, error);
@@ -142,16 +170,20 @@ stepPromise.then(function() {
 	log('All tests run successfully!');
 }).catch(function(err) {
 	if (err instanceof StepError) {
+		var originalError = err.originalError;
 		log('\nStep failed:');
 		log(err.step.location + '> ' + err.step.line);
-		log('Reason:', err.originalError);
-		if (err.originalError.stack) {
-			log(err.originalError.stack);
+		var message = originalError.message || originalError;
+		log('Reason:', message);
+		log('\nContext at point of failure:', context);
+		if (originalError.stack) {
+			log('\nStacktrace:\n', originalError.stack);
 		}
 	} else {
 		log('\nSomething went wrong:', err);
 		log(err.stack);
 	}
+	process.exit(1);
 });
 
 

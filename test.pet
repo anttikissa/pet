@@ -1,4 +1,7 @@
-when I say 'first'
+when I print 'first'
 and I wait 100 milliseconds
-and I say 'second'
-and I fail because 'sky is blue'
+and I print 'second'
+# Try this to see error message
+# then I see 3 lines of output
+then I see 2 lines of output
+# and I fail because 'sky is blue'
