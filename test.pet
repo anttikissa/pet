@@ -1,2 +1,3 @@
 when I say "What's your name?"
+and I wait 100 milliseconds
 and I say 'Hello "Dolly"' and I also say "World's end"

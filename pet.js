@@ -9,10 +9,17 @@ function assert(fact) {
 	}
 }
 
-function stripQuotes(string) {
-	assert(string[0] === string[string.length-1]);
-	assert(string[0] === '"' || string[0] === "'");
-	return string.slice(1, string.length - 1);
+// Convert string literals like '"this"' into 'this' (likewise for double quotes),
+// and number literals like "12345" into numbers.
+function undressLiteral(literal) {
+	if (literal[0] === '"' || literal[0] === "'") {
+		assert(literal[0] === literal[literal.length-1]);
+		return literal.slice(1, literal.length - 1);
+	} else {
+		var result = parseFloat(literal);
+		assert(!isNaN(result));
+		return result;
+	}
 }
 
 function findStep(line) {
@@ -21,7 +28,7 @@ function findStep(line) {
 		if (match) {
 			return {
 				step: step,
-				args: match.slice(1, match.length).map(stripQuotes)
+				args: match.slice(1, match.length).map(undressLiteral)
 			};
 		}
 	}
@@ -41,7 +48,11 @@ function createRecognizer(what) {
 		//log('match', match);
 		//This monster matches either "string constants" or 'string constants'
 		// (like in JavaScript). It captures the whole thing, quotes included.
-		return "('(?:(?:\\.|[^'])*)'|\"(?:(?:\\.|[^\"])*)\")";
+		var singleQuotedStringRegexp = "'(?:(?:\\.|[^'])*)'";
+		var doubleQuotedStringRegexp = "\"(?:(?:\\.|[^\"])*)\"";
+		var numberRegexp = "[-+]?[0-9]*\\.?[0-9]+";
+
+		return "(" + singleQuotedStringRegexp + "|" + doubleQuotedStringRegexp + "|" + numberRegexp + ")";
 	});
 
 	return new RegExp('^' + result + '$');
