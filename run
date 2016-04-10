@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+// vi: set ft=javascript:
+
+var waiting = false;
+
+function run() {
+	waiting = false;
+	var start = new Date();
+	var child = require('child_process').spawn('node', ['pet.js']);
+	child.stdout.pipe(process.stdout);
+	child.stderr.pipe(process.stderr);
+	child.on('exit', function(code) {
+		var end = new Date();
+		setTimeout(function() {
+			console.log('took', ((end - start) / 1000).toFixed(2), 'seconds, exit code', code, '\n');
+		}, 10);
+	});
+}
+
+run();
+require('chokidar').watch(['*.js', '*.pet']).on('change', function() {
+	if (waiting)
+		return;
+
+	waiting = true;
+	setTimeout(run, 50);
+});
+
