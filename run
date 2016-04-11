@@ -6,7 +6,7 @@ var waiting = false;
 function run() {
 	waiting = false;
 	var start = new Date();
-	var child = require('child_process').spawn('node', ['pet.js']);
+	var child = require('child_process').spawn('node', ['pet.js', '--color']);
 	child.stdout.pipe(process.stdout);
 	child.stderr.pipe(process.stderr);
 	child.on('exit', function(code) {

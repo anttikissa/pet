@@ -3,9 +3,51 @@
 var fs = require('fs');
 var util = require('util');
 
-var log = console.log.bind(console);
+// This will add .red, .green etc. to the String prototype.
+require('colors');
 
-var steps = [];
+//
+// log - a micro-library for logging
+//
+// log('stuff')
+// log('stuff', [1, 2, 'more']); // all logging methods understand multiple arguments, like console.log
+// log.e('error (in red)');
+// log.s('successful (in green)');
+// log.i('important/info (typically data explaining the error)');
+//
+
+function log() {
+	console.log.apply(console, arguments);
+}
+
+log.formatArgs = function(args) {
+	return [].slice.apply(args).map(function(arg) {
+		return typeof arg === 'object' ? util.inspect(arg) : String(arg)
+	}).join(' ');
+}
+
+// Log erroneous stuff (in red)
+log.e = function() {
+	this(this.formatArgs(arguments).red);
+};
+
+// Log successful stuff (in green)
+log.s = function() {
+	this(this.formatArgs(arguments).green);
+};
+
+// Log important stuff (in a visible color)
+log.i = function() {
+	this(this.formatArgs(arguments).magenta);
+};
+
+//
+// assert - a micro-library for failing with grace
+//
+// assert(fact);
+// assert.eq(actual, expected);
+// assert.eq(actual, expected, 'amount of bananas');
+//
 
 function assert(fact) {
 	if (!fact) {
@@ -19,7 +61,7 @@ function assert(fact) {
 // 'what' is an optional string describing the nature of compared values. Use it to get
 // better error messages:
 //
-//     assert.eq(data.howManyApples, 3, "amount of apples");
+//     assert.eq(data.howManyApples, 3, 'amount of apples');
 //
 // => "Expected amount of apples to be 3, but it was 0."
 assert.eq = function(actual, expected, what) {
@@ -47,27 +89,16 @@ function undressLiteral(literal) {
 	}
 }
 
-function findStep(line) {
-	for (var step of steps) {
-		var match = step.recognizer.exec(line);
-		if (match) {
-			return {
-				step: step,
-				args: match.slice(1, match.length).map(undressLiteral)
-			};
-		}
-	}
-}
 
-// Convert a step descriptions, e.g.
+// Convert a step description, e.g.
 //
 //   'I see $text and $moreText',
 //
-// into a regular expression that matches strings, like
+// into a regular expression that matches strings or numbers, such as like
 //
 //   'I see "abc" and "xyz"',
 //
-// capturing "abc" and "xyz".
+// capturing "abc" and "xyz" with the regular expression.
 function createRecognizer(what) {
 	var result = what.replace(/(\$(\w|-)+)\b/g, function(/* match */) {
 		//log('match', match);
@@ -81,6 +112,20 @@ function createRecognizer(what) {
 	});
 
 	return new RegExp('^' + result + '$');
+}
+
+var steps = [];
+
+function findStep(line) {
+	for (var step of steps) {
+		var match = step.recognizer.exec(line);
+		if (match) {
+			return {
+				step: step,
+				args: match.slice(1, match.length).map(undressLiteral)
+			};
+		}
+	}
 }
 
 module.exports = {
@@ -138,6 +183,7 @@ lines.forEach(function(line, idx) {
 		location: filename + ':' + lineNumber,
 		line: line,
 		f: parsed.step.f,
+		what: parsed.step.what,
 		args: parsed.args
 	});
 });
@@ -151,9 +197,13 @@ function StepError(step, originalError) {
 
 var context = {};
 
+function formatLine(step) {
+	return step.location + '> ' + step.line;
+}
+
 for (let step of stepsToRun) {
 	stepPromise = stepPromise.then(function() {
-		log(step.location + '>', step.line);
+		log(formatLine(step, step));
 		return step.f.apply(context, step.args);
 	}).catch(function(error) {
 		if (!(error instanceof StepError)) {
@@ -167,21 +217,22 @@ for (let step of stepsToRun) {
 }
 
 stepPromise.then(function() {
-	log('All tests run successfully!');
+	log('\nAll tests run successfully!'.green);
 }).catch(function(err) {
 	if (err instanceof StepError) {
 		var originalError = err.originalError;
-		log('\nStep failed:');
-		log(err.step.location + '> ' + err.step.line);
+		log.i('\nStep failed:\n');
+		log.e(formatLine(err.step));
 		var message = originalError.message || originalError;
-		log('Reason:', message);
-		log('\nContext at point of failure:', context);
+		log.i(`\nReason: ${message}`);
+		log.i(`\nFailing step: '${err.step.what}':`, err.step.f);
+		log.i(`\nContext at point of failure: ${util.inspect(context)}`);
 		if (originalError.stack) {
-			log('\nStacktrace:\n', originalError.stack);
+			log.i('\nStacktrace:\n', originalError.stack);
 		}
 	} else {
-		log('\nSomething went wrong:', err);
-		log(err.stack);
+		log.i('\nSomething went wrong:', err);
+		log.i(err.stack);
 	}
 	process.exit(1);
 });
