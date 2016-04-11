@@ -15,6 +15,7 @@ test 'another test'
 	and I wait 75 milliseconds
 	and I print '!'
 	then I see 3 lines of output
+	and I fail because 'I want to see failure'
 
 test 'a failing test'
 	when I wait 100 milliseconds
