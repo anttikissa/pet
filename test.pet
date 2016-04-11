@@ -1,7 +1,23 @@
-when I print 'first'
-and I wait 100 milliseconds
-and I print 'second'
-# Try this to see an error message:
-# then I see 3 lines of output
-then I see 2 lines of output
-# and I fail because 'sky is blue'
+
+test 'printing two lines'
+	when I print 'first'
+	and I wait 100 milliseconds
+	and I print 'second'
+	# Try this to see an error message:
+	# then I see 3 lines of output
+	then I see 2 lines of output
+	# and I fail because 'sky is blue'
+
+test 'another test'
+	when I print 'hello'
+	and I wait 75 milliseconds
+	and I print 'world'
+	and I wait 75 milliseconds
+	and I print '!'
+	then I see 3 lines of output
+
+test 'a failing test'
+	when I wait 100 milliseconds
+	# then I fail because 'why not?'
+
+

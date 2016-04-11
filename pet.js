@@ -147,20 +147,36 @@ function isCommentedOut(line) {
 	return line.trim()[0] === '#';
 }
 
+// Return a parsed line (or undefined, in which case line should be ignored)
 function parse(line, lineNumber) {
 	if (isCommentedOut(line)) {
 		return;
 	}
-	var match = line.trim().match(/^(?:given|when|then|and) (.*)$/);
-	if (!match) {
+	var trimmed = line.trim();
+	if (!trimmed) {
+		return;
+	}
+
+	var matchTest = trimmed.match(/^test ['"](.*)['"]$/);
+	var matchStep = trimmed.match(/^(?:given|when|then|and) (.*)$/);
+
+	if (matchTest) {
+		return {
+			type: 'test',
+			test: matchTest[1]
+		};
+	} else if (matchStep) {
+		//log('finding step for line', idx + ':', match[1]);
+		var result = findStep(matchStep[1]);
+		result.type = 'step';
+		if (!result) {
+			throw new Error('No step matches line ' + lineNumber + ': ' + line);
+		}
+		log('parsed', result);
+		return result;
+	} else {
 		throw new Error('Syntax error on line ' + lineNumber + ': ' + line);
 	}
-	//log('finding step for line', idx + ':', match[1]);
-	var result = findStep(match[1]);
-	if (!result) {
-		throw new Error('No step matches line ' + lineNumber + ': ' + line);
-	}
-	return result;
 }
 
 require('./test.pet.js');
@@ -170,23 +186,44 @@ var test = fs.readFileSync(filename, 'utf8');
 
 var lines = test.replace(/\n$/, '').split("\n");
 
-var stepsToRun = [];
+var currentTest = null;
+var tests = [];
 
-lines.forEach(function(line, idx) {
-	var lineNumber = idx + 1;
-	var parsed = parse(line, lineNumber);
-	if (!parsed) {
-		return;
-	}
-	//log("Line parsed.", parsed.step.f, parsed.args);
-	stepsToRun.push({
-		location: filename + ':' + lineNumber,
-		line: line,
-		f: parsed.step.f,
-		what: parsed.step.what,
-		args: parsed.args
+try {
+	lines.forEach(function(line, idx) {
+		var lineNumber = idx + 1;
+		var location = filename + ':' + lineNumber;
+		var parsed = parse(line, lineNumber);
+
+		if (!parsed) {
+			return;
+		}
+
+		if (parsed.type === 'test') {
+			currentTest = {
+				name: parsed.test,
+				steps: []
+			}
+			tests.push(currentTest);
+		} else if (parsed.type === 'step') {
+			//log("Step parsed.", parsed.step.f, parsed.args);
+			if (!currentTest) {
+				throw new Error(location + ': ' + line + '\nEncountered a step without a test');
+			}
+			currentTest.steps.push({
+				location: location,
+				line: line,
+				f: parsed.step.f,
+				what: parsed.step.what,
+				args: parsed.args
+			});
+		} else {
+			throw new Error(location + ': strange line: ' + parsed.type);
+		}
 	});
-});
+} catch (e) {
+	log.e(e.message);
+}
 
 var stepPromise = Promise.resolve();
 
@@ -195,25 +232,27 @@ function StepError(step, originalError) {
 	this.originalError = originalError;
 }
 
-var context = {};
 
 function formatLine(step) {
 	return step.location + '> ' + step.line;
 }
 
-for (let step of stepsToRun) {
-	stepPromise = stepPromise.then(function() {
-		log(formatLine(step, step));
-		return step.f.apply(context, step.args);
-	}).catch(function(error) {
-		if (!(error instanceof StepError)) {
-			throw new StepError(step, error);
-		} else {
-			throw error;
-		}
-	});
+for (let test of tests) {
+	let context = {};
+	for (let step of test.steps) {
+		stepPromise = stepPromise.then(function() {
+			log(formatLine(step, step));
+			return step.f.apply(context, step.args);
+		}).catch(function(error) {
+			if (!(error instanceof StepError)) {
+				throw new StepError(step, error);
+			} else {
+				throw error;
+			}
+		});
 
-	stepPromise.step = step;
+		stepPromise.step = step;
+	}
 }
 
 stepPromise.then(function() {

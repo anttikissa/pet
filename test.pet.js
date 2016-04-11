@@ -4,6 +4,7 @@ var step = pet.step;
 
 step('I fail because $reason', function(reason) {
 	//This works, too - if you want a stacktrace
+	//fubar = 1;
 	//throw new Error(reason);
 	return Promise.reject(reason);
 });
